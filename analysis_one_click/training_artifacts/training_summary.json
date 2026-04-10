@@ -1,0 +1,193 @@
+{
+  "settings": {
+    "clean_long": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_WIDE_clean.long.csv",
+    "attack": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_Training_Wide.processed.csv",
+    "output_dir": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts",
+    "angles": [
+      "roll",
+      "pitch",
+      "yaw"
+    ],
+    "epochs_ref": 40,
+    "epochs_gate": 40,
+    "batch_size": 512,
+    "val_fraction": 0.2,
+    "lr_ref": 0.001,
+    "lr_gate": 0.001,
+    "seed": 42,
+    "normalize_features": true,
+    "z_clip": 8.0,
+    "save_diagnostics": true,
+    "export_fdeep": false,
+    "convert_script": "C:\\home\\jiran\\work\\pid-piper\\frugally-deep\\keras_export\\convert_model.py",
+    "base_features_18": [
+      "acc_x",
+      "acc_y",
+      "acc_z",
+      "gyro_x",
+      "gyro_y",
+      "gyro_z",
+      "pos_x",
+      "pos_y",
+      "pos_z",
+      "gpsVel",
+      "ahrsRP",
+      "ahrsYaw",
+      "posVarH",
+      "posVarV",
+      "velVarX",
+      "velVarY",
+      "navRoll",
+      "navPitch"
+    ],
+    "gate_extra_features": [
+      "y_pid",
+      "y_ml",
+      "residual",
+      "ml_pid_gap_abs"
+    ],
+    "fusion_formula": "y_fused = y_pid + alpha * (y_ml - y_pid)",
+    "semantic_normalization": {
+      "clean": {
+        "roll": {
+          "source_unit": "rad",
+          "rows": 4290
+        },
+        "pitch": {
+          "source_unit": "rad",
+          "rows": 4290
+        },
+        "yaw": {
+          "source_unit": "rad",
+          "rows": 4290
+        }
+      },
+      "attack": {
+        "y_pid": {
+          "roll": {
+            "source_unit": "rad",
+            "rows": 71504
+          },
+          "pitch": {
+            "source_unit": "rad",
+            "rows": 71504
+          },
+          "yaw": {
+            "source_unit": "rad",
+            "rows": 71503
+          }
+        },
+        "y_ml": {
+          "roll": {
+            "source_unit": "rad",
+            "rows": 71504
+          },
+          "pitch": {
+            "source_unit": "rad",
+            "rows": 71504
+          },
+          "yaw": {
+            "source_unit": "rad",
+            "rows": 71503
+          }
+        },
+        "y_selected": {
+          "roll": {
+            "source_unit": "rad",
+            "rows": 71504
+          },
+          "pitch": {
+            "source_unit": "rad",
+            "rows": 71504
+          },
+          "yaw": {
+            "source_unit": "rad",
+            "rows": 71503
+          }
+        },
+        "residual": {
+          "roll": {
+            "source_unit": "rad",
+            "rows": 71504
+          },
+          "pitch": {
+            "source_unit": "rad",
+            "rows": 71504
+          },
+          "yaw": {
+            "source_unit": "rad",
+            "rows": 71503
+          }
+        }
+      }
+    }
+  },
+  "artifacts": [
+    {
+      "angle": "roll",
+      "ref_h5": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\roll\\roll_ref.h5",
+      "gate_h5": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\roll\\roll_gate.h5",
+      "ref_scaler_json": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\roll\\roll_ref_scaler.json",
+      "gate_scaler_json": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\roll\\roll_gate_scaler.json",
+      "diagnostics_json": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\roll\\roll_diagnostics.json",
+      "ref_json": null,
+      "gate_json": null,
+      "ref_train_rows": 3432,
+      "ref_val_rows": 858,
+      "gate_train_rows": 57203,
+      "gate_val_rows": 14301,
+      "mae_fused_vs_ref": 1.0279208421707153,
+      "rmse_fused_vs_ref": 1.0985913620652783,
+      "mae_selected_vs_ref": 1.0413683652877808,
+      "rmse_selected_vs_ref": 1.1110218343366078,
+      "mae_pid_vs_ref": 1.040289044380188,
+      "rmse_pid_vs_ref": 1.1103833948032973,
+      "mae_ml_vs_ref": 1.0288432836532593,
+      "rmse_ml_vs_ref": 1.0990910502682592
+    },
+    {
+      "angle": "pitch",
+      "ref_h5": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\pitch\\pitch_ref.h5",
+      "gate_h5": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\pitch\\pitch_gate.h5",
+      "ref_scaler_json": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\pitch\\pitch_ref_scaler.json",
+      "gate_scaler_json": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\pitch\\pitch_gate_scaler.json",
+      "diagnostics_json": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\pitch\\pitch_diagnostics.json",
+      "ref_json": null,
+      "gate_json": null,
+      "ref_train_rows": 3432,
+      "ref_val_rows": 858,
+      "gate_train_rows": 57203,
+      "gate_val_rows": 14301,
+      "mae_fused_vs_ref": 1.5746831893920898,
+      "rmse_fused_vs_ref": 1.6990398444341597,
+      "mae_selected_vs_ref": 1.6157283782958984,
+      "rmse_selected_vs_ref": 1.7363887471621562,
+      "mae_pid_vs_ref": 1.6289074420928955,
+      "rmse_pid_vs_ref": 1.7503761840851177,
+      "mae_ml_vs_ref": 1.5746694803237915,
+      "rmse_ml_vs_ref": 1.6990241980712675
+    },
+    {
+      "angle": "yaw",
+      "ref_h5": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\yaw\\yaw_ref.h5",
+      "gate_h5": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\yaw\\yaw_gate.h5",
+      "ref_scaler_json": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\yaw\\yaw_ref_scaler.json",
+      "gate_scaler_json": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\yaw\\yaw_gate_scaler.json",
+      "diagnostics_json": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\training_artifacts\\yaw\\yaw_diagnostics.json",
+      "ref_json": null,
+      "gate_json": null,
+      "ref_train_rows": 3432,
+      "ref_val_rows": 858,
+      "gate_train_rows": 57202,
+      "gate_val_rows": 14301,
+      "mae_fused_vs_ref": 0.14524045586585999,
+      "rmse_fused_vs_ref": 0.17732020738595797,
+      "mae_selected_vs_ref": 0.16006964445114136,
+      "rmse_selected_vs_ref": 0.19884929806554466,
+      "mae_pid_vs_ref": 0.16277246177196503,
+      "rmse_pid_vs_ref": 0.2064361927540822,
+      "mae_ml_vs_ref": 0.16217082738876343,
+      "rmse_ml_vs_ref": 0.19323207055315028
+    }
+  ]
+}

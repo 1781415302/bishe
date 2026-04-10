@@ -1,0 +1,213 @@
+{
+  "input_dir": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click",
+  "selected_files": {
+    "clean": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_WIDE_clean.csv",
+    "attack": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_Training_Wide.csv"
+  },
+  "detected_files": {
+    "clean": [
+      "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_WIDE_clean.csv",
+      "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_WIDE_clean.processed.csv"
+    ],
+    "attack": [
+      "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_Training_Wide.csv",
+      "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_Training_Wide.processed.csv"
+    ],
+    "unknown": [
+      "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_WIDE_clean.long.csv"
+    ]
+  },
+  "clean_report": {
+    "input_rows": 8954,
+    "duplicate_rows_detected": 0,
+    "duplicate_rows_dropped": 0,
+    "altitude_filter": {
+      "enabled": true,
+      "clean_min_alt_m": 48.0,
+      "pos_z_unit_detected": "cm",
+      "rule": "abs(pos_z) > threshold",
+      "raw_threshold_used": 4800.0,
+      "dropped_rows": 4664
+    },
+    "unit_harmonization": {
+      "position_unit_detected": "cm",
+      "applied": {
+        "position": {
+          "from": "cm",
+          "to": "cm",
+          "factor": 1.0
+        },
+        "gpsVel": {
+          "from": "cm/s_or_other",
+          "to": "cm/s_or_other",
+          "factor": 1.0
+        },
+        "angles": {
+          "navRoll": {
+            "from": "centideg_or_other",
+            "to": "centideg_or_other",
+            "factor": 1.0
+          },
+          "navPitch": {
+            "from": "centideg_or_other",
+            "to": "centideg_or_other",
+            "factor": 1.0
+          }
+        },
+        "gt_angles": {
+          "columns": [
+            "gt_roll",
+            "gt_pitch",
+            "gt_yaw"
+          ],
+          "kept_as": "radians"
+        }
+      }
+    },
+    "missing_before_fill": {
+      "timestamp": 0,
+      "acc_x": 0,
+      "acc_y": 0,
+      "acc_z": 0,
+      "gyro_x": 0,
+      "gyro_y": 0,
+      "gyro_z": 0,
+      "pos_x": 0,
+      "pos_y": 0,
+      "pos_z": 0,
+      "gpsVel": 0,
+      "ahrsRP": 0,
+      "ahrsYaw": 0,
+      "posVarH": 0,
+      "posVarV": 0,
+      "velVarX": 0,
+      "velVarY": 0,
+      "navRoll": 0,
+      "navPitch": 0,
+      "gt_roll": 0,
+      "gt_pitch": 0,
+      "gt_yaw": 0
+    },
+    "missing_after_fill": {
+      "timestamp": 0,
+      "acc_x": 0,
+      "acc_y": 0,
+      "acc_z": 0,
+      "gyro_x": 0,
+      "gyro_y": 0,
+      "gyro_z": 0,
+      "pos_x": 0,
+      "pos_y": 0,
+      "pos_z": 0,
+      "gpsVel": 0,
+      "ahrsRP": 0,
+      "ahrsYaw": 0,
+      "posVarH": 0,
+      "posVarV": 0,
+      "velVarX": 0,
+      "velVarY": 0,
+      "navRoll": 0,
+      "navPitch": 0,
+      "gt_roll": 0,
+      "gt_pitch": 0,
+      "gt_yaw": 0
+    },
+    "dropped_rows_remaining_numeric_nan": 0,
+    "dropped_rows_on_key_columns": 0,
+    "output_rows": 4290
+  },
+  "attack_report": {
+    "input_rows": 214512,
+    "invalid_angle_type_rows": 1,
+    "duplicate_rows_detected": 0,
+    "duplicate_rows_dropped": 0,
+    "missing_before_fill": {
+      "timestamp": 0,
+      "acc_x": 0,
+      "acc_y": 0,
+      "acc_z": 0,
+      "gyro_x": 0,
+      "gyro_y": 0,
+      "gyro_z": 0,
+      "pos_x": 0,
+      "pos_y": 0,
+      "pos_z": 0,
+      "gpsVel": 0,
+      "ahrsRP": 0,
+      "ahrsYaw": 0,
+      "posVarH": 0,
+      "posVarV": 0,
+      "velVarX": 0,
+      "velVarY": 0,
+      "navRoll": 0,
+      "navPitch": 0,
+      "navYaw": 0,
+      "y_pid": 0,
+      "y_ml": 0,
+      "residual": 0,
+      "y_selected": 0,
+      "attack_label": 0,
+      "recovery_mode": 0
+    },
+    "missing_after_fill": {
+      "timestamp": 0,
+      "acc_x": 0,
+      "acc_y": 0,
+      "acc_z": 0,
+      "gyro_x": 0,
+      "gyro_y": 0,
+      "gyro_z": 0,
+      "pos_x": 0,
+      "pos_y": 0,
+      "pos_z": 0,
+      "gpsVel": 0,
+      "ahrsRP": 0,
+      "ahrsYaw": 0,
+      "posVarH": 0,
+      "posVarV": 0,
+      "velVarX": 0,
+      "velVarY": 0,
+      "navRoll": 0,
+      "navPitch": 0,
+      "navYaw": 0,
+      "y_pid": 0,
+      "y_ml": 0,
+      "residual": 0,
+      "y_selected": 0,
+      "attack_label": 0,
+      "recovery_mode": 0
+    },
+    "dropped_rows_remaining_numeric_nan": 0,
+    "attack_label_invalid_rows": 0,
+    "recovery_mode_invalid_rows": 0,
+    "attack_label_unique_values": [
+      "0.0",
+      "1.0"
+    ],
+    "recovery_mode_unique_values": [
+      "0.0",
+      "1.0"
+    ],
+    "dropped_rows_on_key_columns": 0,
+    "attack_recovery_counts": {
+      "attack_0_recovery_0": 69765,
+      "attack_0_recovery_1": 20588,
+      "attack_1_recovery_0": 110217,
+      "attack_1_recovery_1": 13941
+    },
+    "output_rows": 214511
+  },
+  "outputs": {
+    "clean_processed": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_WIDE_clean.processed.csv",
+    "attack_processed": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_Training_Wide.processed.csv",
+    "clean_long": "\\\\wsl.localhost\\Ubuntu-18.04\\home\\jiran\\work\\pid-piper\\analysis_one_click\\Data_Piper_WIDE_clean.long.csv"
+  },
+  "settings": {
+    "fill_strategy": "ffill",
+    "drop_exact_duplicates": false,
+    "drop_remaining_nan": true,
+    "binary_label_policy": "keep",
+    "clean_min_alt_m": 48.0,
+    "clean_unit_harmonization": true
+  }
+}
