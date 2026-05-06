@@ -2,6 +2,7 @@
 #include "AC_PosControl.h"
 #include <AP_Math/AP_Math.h>
 #include <AP_Logger/AP_Logger.h>
+#include <SITL/SITL.h>
 #include<time.h>
 #include<unistd.h>
 
@@ -181,6 +182,21 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("_ANGLE_MAX",  7, AC_PosControl, _lean_angle_max, 0.0f),
+
+    // @Param: _ATK_SCN
+    // @DisplayName: PID-Piper false data attack scenario
+    // @Description: False data injection scenario selector. 0 keeps legacy behavior, 1 is light intermittent attack, 2 is medium baseline attack, 3 is heavy burst attack.
+    // @Values: 0:Legacy,1:Light,2:Medium,3:Heavy
+    // @Range: 0 3
+    // @User: Advanced
+    AP_GROUPINFO("_ATK_SCN",   8, AC_PosControl, _attack_scenario, 0),
+
+    // @Param: _ATK_SEED
+    // @DisplayName: PID-Piper false data attack seed
+    // @Description: Seed used by attack scenario jitter generator. Set different values per run to get deterministic but different attack cycles.
+    // @Range: 0 32767
+    // @User: Advanced
+    AP_GROUPINFO("_ATK_SEED",  9, AC_PosControl, _attack_seed, 0),
 
     AP_GROUPEND
 };
@@ -848,7 +864,7 @@ void AC_PosControl::write_log()
     lean_angles_to_accel(accel_x, accel_y);
 
     AP::logger().Write("PSC", "TimeUS,TPX,TPY,PX,PY,TVX,TVY,VX,VY,TAX,TAY,AX,AY",
-                                           "smmmmnnnnoooo", "FBBBBBBBBBBBB", "Qffffffffffff",
+                                           "smmmmnnnnoooo", "F------------", "Qffffffffffff",
                                            AP_HAL::micros64(),
                                            (double)pos_target.x,
                                            (double)pos_target.y,
@@ -1016,6 +1032,7 @@ void AC_PosControl::run_xy_controller(float dt)
      */
 
     startFlightTimer();
+    updateIMUAttackValues();
 
     int checkTime = checkTimer();
     if(checkTime == 1)
@@ -1023,8 +1040,12 @@ void AC_PosControl::run_xy_controller(float dt)
         int checkAttackTime = checkAttackTimer();
         if(checkAttackTime == 1)
         {
-            curr_pos.x = curr_pos.x + falseData;
-            // curr_pos.y = curr_pos.y + falseData;
+            if (_attack_apply_x) {
+                curr_pos.x = curr_pos.x + falseData;
+            }
+            if (_attack_apply_y) {
+                curr_pos.y = curr_pos.y + falseData;
+            }
 
         }
         flag = checkAttackTime;
@@ -1350,6 +1371,106 @@ void AC_PosControl::startFlightTimer()
     }
 }
 
+void AC_PosControl::resetAttackSeedIfNeeded()
+{
+    const int16_t seed = _attack_seed.get();
+    if (seed == _attack_seed_applied) {
+        return;
+    }
+    _attack_seed_applied = seed;
+    _attack_cycle_count = 0;
+    const uint32_t base = static_cast<uint16_t>(seed);
+    _attack_rng_state = (base == 0U) ? 1U : (base * 747796405U + 2891336453U);
+}
+
+float AC_PosControl::nextAttackRandom01()
+{
+    _attack_rng_state = (_attack_rng_state * 1664525U) + 1013904223U;
+    return static_cast<float>(_attack_rng_state & 0x00FFFFFFU) / 16777215.0f;
+}
+
+void AC_PosControl::configureAttackCycle()
+{
+    // Get GPS attack scenario from SITL parameters
+    SITL::SITL *sitl = AP::sitl();
+    if (sitl == nullptr) {
+        return;  // SITL not available
+    }
+    
+    const int8_t scenario = static_cast<int8_t>(constrain_int16(sitl->gps_atk_scenario.get(), 0, 3));
+    
+    // Scenario 0 means no GPS attack
+    if (scenario == 0) {
+        falseData = 0.0f;
+        _attack_on_duration_s = 0.0f;
+        _attack_off_duration_s = 0.0f;
+        _attack_apply_x = false;
+        _attack_apply_y = false;
+        return;
+    }
+    
+    resetAttackSeedIfNeeded();
+    
+    float amp_cm = 200.0f;
+    float on_s = 5.0f;
+    float off_s = 3.0f;
+    uint8_t axis_mode = 0; // 0:x, 1:y, 2:xy, 3:alternate x/y per attack cycle
+
+    switch (scenario) {
+    case 1:
+        amp_cm = 100.0f;
+        on_s = 2.0f;
+        off_s = 4.0f;
+        axis_mode = 0;
+        break;
+    case 2:
+        amp_cm = 200.0f;
+        on_s = 5.0f;
+        off_s = 3.0f;
+        axis_mode = 0;
+        break;
+    case 3:
+        amp_cm = 350.0f;
+        on_s = 6.0f;
+        off_s = 2.0f;
+        axis_mode = 3;
+        break;
+    default:
+        // scenario 0 keeps legacy behavior exactly.
+        break;
+    }
+
+    if (scenario > 0) {
+        const float amp_jitter = (nextAttackRandom01() * 2.0f - 1.0f) * 0.15f;
+        const float on_jitter = (nextAttackRandom01() * 2.0f - 1.0f) * 0.35f;
+        const float off_jitter = (nextAttackRandom01() * 2.0f - 1.0f) * 0.35f;
+
+        amp_cm = amp_cm * (1.0f + amp_jitter);
+        on_s = MAX(0.5f, on_s + on_jitter);
+        off_s = MAX(0.5f, off_s + off_jitter);
+    }
+
+    falseData = MAX(1.0f, amp_cm);
+    _attack_on_duration_s = on_s;
+    _attack_off_duration_s = off_s;
+
+    _attack_apply_x = true;
+    _attack_apply_y = false;
+    if (axis_mode == 1) {
+        _attack_apply_x = false;
+        _attack_apply_y = true;
+    } else if (axis_mode == 2) {
+        _attack_apply_x = true;
+        _attack_apply_y = true;
+    } else if (axis_mode == 3) {
+        const bool x_this_cycle = ((_attack_cycle_count % 2U) == 0U);
+        _attack_apply_x = x_this_cycle;
+        _attack_apply_y = !x_this_cycle;
+    }
+
+    _attack_cycle_count++;
+}
+
 int AC_PosControl::checkTimer()
 {
     tNow = clock();
@@ -1363,19 +1484,21 @@ int AC_PosControl::checkTimer()
 
 void AC_PosControl::initAttackTimer()
 {
-    tAttack = clock() + (5 * CLOCKS_PER_SEC);
+    tAttack = clock() + static_cast<clock_t>(MAX(0.5f, _attack_on_duration_s) * CLOCKS_PER_SEC);
 }
 
 int AC_PosControl::checkAttackTimer()
 {
     if(!initAttackTime)
     {
+        configureAttackCycle();
         initAttackTimer();
         initAttackTime = true;
         fdiAttackReturn = 1;
+        return fdiAttackReturn;
     }
 
-    else if(tNow > tAttack)
+    if(tNow > tAttack)
     {
         if(!initNoAttackTime)
         {
@@ -1383,19 +1506,23 @@ int AC_PosControl::checkAttackTimer()
             initNoAttackTime = true;
         }
         fdiAttackReturn = checkNoAttackTimer();
+        return fdiAttackReturn;
     }
+
+    fdiAttackReturn = 1;
     return fdiAttackReturn;
 }
 
 void AC_PosControl::initNoAttackTimer()
 {
-    tNoAttack = clock() + (3 * CLOCKS_PER_SEC);
+    tNoAttack = clock() + static_cast<clock_t>(MAX(0.5f, _attack_off_duration_s) * CLOCKS_PER_SEC);
 }
 
 int AC_PosControl::checkNoAttackTimer()
 {
     if(tNow > tNoAttack)
     {
+        configureAttackCycle();
         initAttackTimer();
         initNoAttackTime = false;
         fdiAttackReturn2 = 1;
@@ -1405,6 +1532,207 @@ int AC_PosControl::checkNoAttackTimer()
     return fdiAttackReturn2;
 }
 
+/*
+ * IMU False Data Injection Implementation
+ */
+
+void AC_PosControl::resetIMUAttackSeedIfNeeded()
+{
+    SITL::SITL *sitl = AP::sitl();
+    if (sitl == nullptr) {
+        return;
+    }
+    
+    const int16_t seed = sitl->imu_atk_seed.get();
+    if (seed == imu_attack_seed_applied) {
+        return;
+    }
+    imu_attack_seed_applied = seed;
+    imu_attack_cycle_count = 0;
+    const uint32_t base = static_cast<uint16_t>(seed);
+    imu_attack_rng_state = (base == 0U) ? 1U : (base * 747796405U + 2891336453U);
+}
+
+float AC_PosControl::nextIMUAttackRandom01()
+{
+    imu_attack_rng_state = (imu_attack_rng_state * 1664525U) + 1013904223U;
+    return static_cast<float>(imu_attack_rng_state & 0x00FFFFFFU) / 16777215.0f;
+}
+
+void AC_PosControl::configureIMUAttackCycle()
+{
+    SITL::SITL *sitl = AP::sitl();
+    if (sitl == nullptr) {
+        return;
+    }
+    
+    resetIMUAttackSeedIfNeeded();
+
+    const int8_t scenario = static_cast<int8_t>(constrain_int16(sitl->imu_atk_scenario.get(), 0, 3));
+    float accel_amp = 0.5f;     // m/s/s
+    float gyro_amp = 0.2f;      // rad/s
+    float on_s = 5.0f;
+    float off_s = 3.0f;
+    uint8_t axis_mode = 0;      // 0:accel_x, 1:accel_y, 2:accel_z, 3:gyro_x, 4:gyro_y, 5:gyro_z, 6:all
+
+    switch (scenario) {
+    case 1:
+        // Light attack: 0.3 m/s/s accel, 0.1 rad/s gyro, X-axis acceleration only
+        accel_amp = 0.3f;
+        gyro_amp = 0.1f;
+        on_s = 2.0f;
+        off_s = 4.0f;
+        axis_mode = 0;  // accel_x
+        break;
+    case 2:
+        // Medium attack: 0.5 m/s/s accel, 0.2 rad/s gyro, X/Y acceleration and X gyro
+        accel_amp = 0.5f;
+        gyro_amp = 0.2f;
+        on_s = 5.0f;
+        off_s = 3.0f;
+        axis_mode = 6;  // all
+        break;
+    case 3:
+        // Heavy attack: 1.0 m/s/s accel, 0.4 rad/s gyro, all axes
+        accel_amp = 1.0f;
+        gyro_amp = 0.4f;
+        on_s = 6.0f;
+        off_s = 2.0f;
+        axis_mode = 6;  // all
+        break;
+    default:
+        // scenario 0: disabled
+        accel_amp = 0.0f;
+        gyro_amp = 0.0f;
+        break;
+    }
+
+    if (scenario > 0) {
+        const float accel_jitter = (nextIMUAttackRandom01() * 2.0f - 1.0f) * 0.15f;
+        const float gyro_jitter = (nextIMUAttackRandom01() * 2.0f - 1.0f) * 0.15f;
+        const float on_jitter = (nextIMUAttackRandom01() * 2.0f - 1.0f) * 0.35f;
+        const float off_jitter = (nextIMUAttackRandom01() * 2.0f - 1.0f) * 0.35f;
+
+        accel_amp = MAX(0.0f, accel_amp * (1.0f + accel_jitter));
+        gyro_amp = MAX(0.0f, gyro_amp * (1.0f + gyro_jitter));
+        on_s = MAX(0.5f, on_s + on_jitter);
+        off_s = MAX(0.5f, off_s + off_jitter);
+    }
+
+    imu_accel_amplitude = accel_amp;
+    imu_gyro_amplitude = gyro_amp;
+    imu_attack_on_duration_s = on_s;
+    imu_attack_off_duration_s = off_s;
+
+    // Configure which axes to attack based on mode
+    imu_attack_apply_accel_x = false;
+    imu_attack_apply_accel_y = false;
+    imu_attack_apply_accel_z = false;
+    imu_attack_apply_gyro_x = false;
+    imu_attack_apply_gyro_y = false;
+    imu_attack_apply_gyro_z = false;
+
+    if (axis_mode == 0) {
+        imu_attack_apply_accel_x = true;
+    } else if (axis_mode == 1) {
+        imu_attack_apply_accel_y = true;
+    } else if (axis_mode == 2) {
+        imu_attack_apply_accel_z = true;
+    } else if (axis_mode == 3) {
+        imu_attack_apply_gyro_x = true;
+    } else if (axis_mode == 4) {
+        imu_attack_apply_gyro_y = true;
+    } else if (axis_mode == 5) {
+        imu_attack_apply_gyro_z = true;
+    } else if (axis_mode == 6) {
+        // All axes
+        imu_attack_apply_accel_x = true;
+        imu_attack_apply_accel_y = true;
+        imu_attack_apply_accel_z = true;
+        imu_attack_apply_gyro_x = true;
+        imu_attack_apply_gyro_y = true;
+        imu_attack_apply_gyro_z = true;
+    }
+
+    imu_attack_cycle_count++;
+}
+
+void AC_PosControl::initIMUAttackTimer()
+{
+    tIMUAttack = clock() + static_cast<clock_t>(MAX(0.5f, imu_attack_on_duration_s) * CLOCKS_PER_SEC);
+}
+
+int AC_PosControl::checkIMUAttackTimer()
+{
+    if (!initIMUAttackTime) {
+        configureIMUAttackCycle();
+        initIMUAttackTimer();
+        initIMUAttackTime = true;
+        imu_fdiAttackReturn = 1;
+        return imu_fdiAttackReturn;
+    }
+
+    if (tNow > tIMUAttack) {
+        if (!initIMUNoAttackTime) {
+            initIMUNoAttackTimer();
+            initIMUNoAttackTime = true;
+        }
+        imu_fdiAttackReturn = checkIMUNoAttackTimer();
+        return imu_fdiAttackReturn;
+    }
+
+    imu_fdiAttackReturn = 1;
+    return imu_fdiAttackReturn;
+}
+
+void AC_PosControl::initIMUNoAttackTimer()
+{
+    tIMUNoAttack = clock() + static_cast<clock_t>(MAX(0.5f, imu_attack_off_duration_s) * CLOCKS_PER_SEC);
+}
+
+int AC_PosControl::checkIMUNoAttackTimer()
+{
+    if (tNow > tIMUNoAttack) {
+        configureIMUAttackCycle();
+        initIMUAttackTimer();
+        initIMUNoAttackTime = false;
+        imu_fdiAttackReturn2 = 1;
+    } else {
+        imu_fdiAttackReturn2 = 0;
+    }
+    return imu_fdiAttackReturn2;
+}
+
+void AC_PosControl::updateIMUAttackValues()
+{
+    SITL::SITL *sitl = AP::sitl();
+    if (sitl == nullptr) {
+        return;
+    }
+    
+    // Check if timer should trigger attack
+    if (checkTimer() > 0 && checkIMUAttackTimer() > 0) {
+        // Randomly determine attack direction (positive or negative)
+        float sign_x = (nextIMUAttackRandom01() > 0.5f) ? 1.0f : -1.0f;
+        float sign_y = (nextIMUAttackRandom01() > 0.5f) ? 1.0f : -1.0f;
+        float sign_z = (nextIMUAttackRandom01() > 0.5f) ? 1.0f : -1.0f;
+
+        sitl->imu_accel_attack_x = imu_attack_apply_accel_x ? (imu_accel_amplitude * sign_x) : 0.0f;
+        sitl->imu_accel_attack_y = imu_attack_apply_accel_y ? (imu_accel_amplitude * sign_y) : 0.0f;
+        sitl->imu_accel_attack_z = imu_attack_apply_accel_z ? (imu_accel_amplitude * sign_z) : 0.0f;
+        sitl->imu_gyro_attack_x = imu_attack_apply_gyro_x ? (imu_gyro_amplitude * sign_x) : 0.0f;
+        sitl->imu_gyro_attack_y = imu_attack_apply_gyro_y ? (imu_gyro_amplitude * sign_y) : 0.0f;
+        sitl->imu_gyro_attack_z = imu_attack_apply_gyro_z ? (imu_gyro_amplitude * sign_z) : 0.0f;
+    } else {
+        // No attack
+        sitl->imu_accel_attack_x = 0.0f;
+        sitl->imu_accel_attack_y = 0.0f;
+        sitl->imu_accel_attack_z = 0.0f;
+        sitl->imu_gyro_attack_x = 0.0f;
+        sitl->imu_gyro_attack_y = 0.0f;
+        sitl->imu_gyro_attack_z = 0.0f;
+    }
+}
 /*
 void AC_PosControl::write_to_piper( float accel_target_x, float accel_target_y,
 		float ahrs_gyro_x, float ahrs_gyro_y, float ahrs_gyro_z,
@@ -1424,6 +1752,11 @@ void AC_PosControl::write_to_piper( float accel_target_x, float accel_target_y,
 }
 
 */
+
+
+
+
+
 
 
 

@@ -2,6 +2,7 @@
 #define PID_PIPER_H
 
 #include <AP_Math/AP_Math.h>
+#include <cstdint>
 #include "LSTM.h"
 
 class PID_Piper
@@ -35,6 +36,9 @@ class PID_Piper
 
 		Vector3f y_ML;
 		Vector3f y_PID;
+		Vector3f y_fused;
+		Vector3f alpha_gate;
+		uint8_t strategyMode = 0;
 		double delta[3] = {0,0,0};
 		double threshold[3] = {18, 18.09, 18.6};
 		double b[3] = {0,0,0};
@@ -54,8 +58,10 @@ class PID_Piper
 		void getAirSpeed(float _airspeed);
 
 		Vector3f getEulerAngle();
+		Vector3f getEulerAngleUser();
 		void cusum(double error[3]);
 		bool checkSwitchControl();
+		void setStrategyMode(uint8_t _mode);
 
 		Vector3f recoveryMonitor();
 

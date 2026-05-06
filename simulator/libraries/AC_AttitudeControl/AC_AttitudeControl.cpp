@@ -148,6 +148,13 @@ const AP_Param::GroupInfo AC_AttitudeControl::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("INPUT_TC", 20, AC_AttitudeControl, _input_tc, AC_ATTITUDE_CONTROL_INPUT_TC_DEFAULT),
 
+    // @Param: PIPER_MODE
+    // @DisplayName: PID-Piper output strategy mode
+    // @Description: Selects the runtime control path for PID-Piper. 0 uses pure PID only, 1 uses original ML only, 2 uses hard switch between PID and original ML based on the residual detector, 3 uses legacy one-frame gate-NN + original ML fusion, 4 uses the 100-frame LSTM gate-NN + original ML fusion.
+    // @Values: 0:PIDOnly, 1:MLOnly, 2:HardSwitchPIDML, 3:LegacyGateNNPlusML, 4:LSTMGateNNPlusML
+    // @User: Advanced
+    AP_GROUPINFO("PIPER_MODE", 21, AC_AttitudeControl, _piper_strategy_mode, 0),
+
     AP_GROUPEND
 };
 
@@ -402,6 +409,8 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_yaw(float euler_roll_angle
 _piper.y_PID.x = euler_roll_angle;
 _piper.y_PID.y = euler_pitch_angle;
 _piper.y_PID.z = euler_yaw_angle;
+
+_piper.setStrategyMode(static_cast<uint8_t>(_piper_strategy_mode.get()));
 
 piper_angles = _piper.recoveryMonitor();
 
@@ -1278,4 +1287,3 @@ void AC_AttitudeControl::write_to_piper(Vector3f piper, Vector3f pid)
 {
 	O_PID_Piper::write_to_file_piper(piper, pid);
 }
-

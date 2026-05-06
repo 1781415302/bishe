@@ -215,6 +215,22 @@ public:
     AP_Vector3f rngfnd_pos_offset;  // XYZ position of the range finder zero range datum relative to the body frame origin (m)
     AP_Vector3f optflow_pos_offset; // XYZ position of the optical flow sensor focal point relative to the body frame origin (m)
 
+    // IMU false data injection parameters
+    AP_Int8  imu_atk_scenario;      // IMU attack scenario selector (0: disabled, 1-3: different attack profiles)
+    AP_Int16 imu_atk_seed;          // IMU attack seed for deterministic jitter
+    
+    // GPS false data injection parameters
+    AP_Int8  gps_atk_scenario;      // GPS attack scenario selector (0: disabled, 1-3: different attack profiles)
+    AP_Int16 gps_atk_seed;          // GPS attack seed for deterministic jitter
+    
+    // IMU attack amplitude values computed and updated by AC_PosControl
+    float imu_accel_attack_x;       // Current false acceleration to inject on X axis (m/s/s)
+    float imu_accel_attack_y;       // Current false acceleration to inject on Y axis (m/s/s)
+    float imu_accel_attack_z;       // Current false acceleration to inject on Z axis (m/s/s)
+    float imu_gyro_attack_x;        // Current false rotation rate to inject on X axis (rad/s)
+    float imu_gyro_attack_y;        // Current false rotation rate to inject on Y axis (rad/s)
+    float imu_gyro_attack_z;        // Current false rotation rate to inject on Z axis (rad/s)
+
     // temperature control
     AP_Float temp_start;
     AP_Float temp_flight;

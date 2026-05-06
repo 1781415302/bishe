@@ -371,6 +371,8 @@ protected:
     // parameters
     AP_Float    _accel_xy_filt_hz;      // XY acceleration filter cutoff frequency
     AP_Float    _lean_angle_max;        // Maximum autopilot commanded angle (in degrees). Set to zero for Angle Max
+    AP_Int8     _attack_scenario;       // False data injection scenario selector (0 keeps legacy behavior)
+    AP_Int16    _attack_seed;           // False data injection seed for per-run deterministic jitter
     AC_P        _p_pos_z;
     AC_P        _p_vel_z;
     AC_PID      _pid_accel_z;
@@ -420,16 +422,57 @@ protected:
 	void startFlightTimer();
 	int checkTimer();
 	int checkAttackTimer();
+    void configureAttackCycle();
+    void resetAttackSeedIfNeeded();
+    float nextAttackRandom01();
 	void initAttackTimer();
 	void initNoAttackTimer();
 	int checkNoAttackTimer();
 	clock_t tStart, tNow, tAttack, tNoAttack;
-	float falseData = 200.0; //error in cm
+    float falseData = 200.0f; //error in cm
     bool initTimer = false, initAttackTime = false, initNoAttackTime = false;
+    float _attack_on_duration_s = 5.0f;
+    float _attack_off_duration_s = 3.0f;
+    bool _attack_apply_x = true;
+    bool _attack_apply_y = false;
+    uint32_t _attack_rng_state = 1;
+    uint32_t _attack_cycle_count = 0;
+    int16_t _attack_seed_applied = 0;
 
 	int flag = 0;
 	int fdiAttackReturn = 0;
 	int fdiAttackReturn2 = 0;
+
+    /*
+     * IMU False Data Injection
+     */
+    void configureIMUAttackCycle();
+    void resetIMUAttackSeedIfNeeded();
+    float nextIMUAttackRandom01();
+    void initIMUAttackTimer();
+    void initIMUNoAttackTimer();
+    int checkIMUAttackTimer();
+    int checkIMUNoAttackTimer();
+    void updateIMUAttackValues();
+	
+    clock_t tIMUAttack, tIMUNoAttack;
+    bool initIMUAttackTime = false, initIMUNoAttackTime = false;
+    float imu_accel_amplitude = 0.5f;  // m/s/s
+    float imu_gyro_amplitude = 0.2f;   // rad/s
+    float imu_attack_on_duration_s = 5.0f;
+    float imu_attack_off_duration_s = 3.0f;
+    uint8_t imu_attack_axis_mode = 0; // 0:acc_x, 1:acc_y, 2:acc_z, 3:gyro_x, 4:gyro_y, 5:gyro_z, 6:all
+    bool imu_attack_apply_accel_x = false;
+    bool imu_attack_apply_accel_y = false;
+    bool imu_attack_apply_accel_z = false;
+    bool imu_attack_apply_gyro_x = false;
+    bool imu_attack_apply_gyro_y = false;
+    bool imu_attack_apply_gyro_z = false;
+    uint32_t imu_attack_rng_state = 1;
+    uint32_t imu_attack_cycle_count = 0;
+    int16_t imu_attack_seed_applied = 0;
+    int imu_fdiAttackReturn = 0;
+    int imu_fdiAttackReturn2 = 0;
 
 	/*
 	 * PID-Piper

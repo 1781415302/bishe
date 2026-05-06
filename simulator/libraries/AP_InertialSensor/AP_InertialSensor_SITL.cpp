@@ -112,6 +112,11 @@ void AP_InertialSensor_SITL::generate_accel(uint8_t instance)
         zAccel = sitl->accel_fail;
     }
 
+    // add IMU false data injection attack
+    xAccel += sitl->imu_accel_attack_x;
+    yAccel += sitl->imu_accel_attack_y;
+    zAccel += sitl->imu_accel_attack_z;
+
     Vector3f accel = Vector3f(xAccel, yAccel, zAccel);
 
     _rotate_and_correct_accel(accel_instance[instance], accel);
@@ -158,6 +163,11 @@ void AP_InertialSensor_SITL::generate_gyro(uint8_t instance)
     gyro.x *= (1 + scale.x*0.01);
     gyro.y *= (1 + scale.y*0.01);
     gyro.z *= (1 + scale.z*0.01);
+
+    // add IMU false data injection attack for gyro
+    gyro.x += sitl->imu_gyro_attack_x;
+    gyro.y += sitl->imu_gyro_attack_y;
+    gyro.z += sitl->imu_gyro_attack_z;
 
     _rotate_and_correct_gyro(gyro_instance[instance], gyro);
     

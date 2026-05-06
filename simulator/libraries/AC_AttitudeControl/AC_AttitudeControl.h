@@ -344,6 +344,9 @@ protected:
     // Enable/Disable angle boost
     AP_Int8             _angle_boost_enabled;
 
+    // PID-Piper output strategy selector (0: hard switch, 1: gate fusion)
+    AP_Int8             _piper_strategy_mode;
+
     // angle controller P objects
     AC_P                _p_angle_roll;
     AC_P                _p_angle_pitch;

@@ -148,6 +148,14 @@ const AP_Param::GroupInfo SITL::var_info2[] = {
     // @Path: ./SIM_Precland.cpp
     AP_SUBGROUPINFO(precland_sim, "PLD_", 29, SITL, SIM_Precland),
 
+
+        // IMU attack injection parameters
+        AP_GROUPINFO("IMU_ATK_SCN",  30, SITL,  imu_atk_scenario, 0),
+        AP_GROUPINFO("IMU_ATK_SEED", 31, SITL,  imu_atk_seed, 0),
+
+        // GPS attack injection parameters
+        AP_GROUPINFO("GPS_ATK_SCN",  32, SITL,  gps_atk_scenario, 0),
+        AP_GROUPINFO("GPS_ATK_SEED", 33, SITL,  gps_atk_seed, 0),
     AP_GROUPEND
 };
     

@@ -78,6 +78,7 @@ INS_ACC3SCAL_Y   1.000
 INS_ACC3SCAL_Z   1.000
 MOT_THST_EXPO 0.5
 MOT_THST_HOVER  0.36
+ATC_PIPER_MODE   4
 # flightmodes
 # switch 1 Circle
 # switch 2 LAND
@@ -95,3 +96,10 @@ MOT_THST_HOVER  0.36
 # CIRCLE 		7 !
 # POSITION 		8
 # LAND 			9 !
+
+# IMU Attack Injection Parameters
+SIM_IMU_ATK_SCN    3
+
+# GPS Attack Injection Parameters
+SIM_GPS_ATK_SCN    3
+SIM_IMU_ATK_SEED   0
