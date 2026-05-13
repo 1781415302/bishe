@@ -30,3 +30,55 @@
 *.exe
 *.out
 *.app
+
+# Local dependency checkouts. Install or clone these outside this repository.
+/eigen/
+/frugally-deep/
+/FunctionalPlus/
+/json/
+/simulator/libraries/fdeep/
+
+# Local editor and Python cache files
+/.vscode/
+*.code-workspace
+__pycache__/
+*.py[cod]
+*:Zone.Identifier
+
+# Training data, preprocessing outputs, and experiment results
+/Data_Piper_*.csv
+/analysis_*/
+/analysis_pair_lstm_*/
+/memory_sync/
+/mission*/
+/gate_pair_manifest*.csv
+/mission_pairs_manifest*.csv
+*.processed.csv
+*.long.csv
+*.meta.json
+preprocessing_report.json
+*_diagnostics.json
+training_summary.json
+
+# Simulator runtime logs and build outputs
+/simulator/build/
+/simulator/.lock-waf_*
+/simulator/Data_Piper_*.csv
+/simulator/attack_*.csv
+/simulator/ArduCopter/logs/
+/simulator/ArduCopter/*.BIN
+/simulator/ArduCopter/*.bin
+/simulator/ArduCopter/*.tlog
+/simulator/ArduCopter/*.tlog.raw
+/simulator/ArduCopter/mav.parm
+/simulator/ArduCopter/pid_piper_mode_experiment/
+/simulator/Tools/autotest/mode_experiment_runs/
+/simulator/Tools/autotest/terrain/
+
+# Thesis and local paper artifacts
+/论文/
+/my_thesis_outline.md
+*.pdf
+*.docx
+*.pptx
+*.xlsx
