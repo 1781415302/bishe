@@ -71,6 +71,8 @@ training_summary.json
 /simulator/ArduCopter/*.tlog
 /simulator/ArduCopter/*.tlog.raw
 /simulator/ArduCopter/mav.parm
+/simulator/ArduCopter/*/logs/
+/simulator/ArduCopter/*/mav.parm
 /simulator/ArduCopter/pid_piper_mode_experiment/
 /simulator/Tools/autotest/mode_experiment_runs/
 /simulator/Tools/autotest/terrain/

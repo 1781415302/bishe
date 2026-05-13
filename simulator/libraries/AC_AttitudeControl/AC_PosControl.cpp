@@ -185,9 +185,9 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
 
     // @Param: _ATK_SCN
     // @DisplayName: PID-Piper false data attack scenario
-    // @Description: False data injection scenario selector. 0 keeps legacy behavior, 1 is light intermittent attack, 2 is medium baseline attack, 3 is heavy burst attack.
-    // @Values: 0:Legacy,1:Light,2:Medium,3:Heavy
-    // @Range: 0 3
+    // @Description: Legacy false data injection scenario selector. Active SITL experiments should use SIM_GPS_ATK_SCN and SIM_IMU_ATK_SCN instead. 0 keeps legacy behavior, 1 is light intermittent attack, 2 is medium baseline attack, 3 is heavy burst attack, 4 is long persistent attack, 5 is extreme short burst attack, 6 is severe stress attack, 7 is catastrophic stress attack.
+    // @Values: 0:Legacy,1:Light,2:Medium,3:Heavy,4:LongPersistent,5:ExtremeBurst,6:SevereStress,7:CatastrophicStress
+    // @Range: 0 7
     // @User: Advanced
     AP_GROUPINFO("_ATK_SCN",   8, AC_PosControl, _attack_scenario, 0),
 
@@ -1373,7 +1373,8 @@ void AC_PosControl::startFlightTimer()
 
 void AC_PosControl::resetAttackSeedIfNeeded()
 {
-    const int16_t seed = _attack_seed.get();
+    SITL::SITL *sitl = AP::sitl();
+    const int16_t seed = (sitl != nullptr) ? sitl->gps_atk_seed.get() : _attack_seed.get();
     if (seed == _attack_seed_applied) {
         return;
     }
@@ -1397,7 +1398,7 @@ void AC_PosControl::configureAttackCycle()
         return;  // SITL not available
     }
     
-    const int8_t scenario = static_cast<int8_t>(constrain_int16(sitl->gps_atk_scenario.get(), 0, 3));
+    const int8_t scenario = static_cast<int8_t>(constrain_int16(sitl->gps_atk_scenario.get(), 0, 7));
     
     // Scenario 0 means no GPS attack
     if (scenario == 0) {
@@ -1434,6 +1435,34 @@ void AC_PosControl::configureAttackCycle()
         on_s = 6.0f;
         off_s = 2.0f;
         axis_mode = 3;
+        break;
+    case 4:
+        // Long persistent medium offset, tests recovery at mission end
+        amp_cm = 250.0f;
+        on_s = 10.0f;
+        off_s = 1.0f;
+        axis_mode = 2;  // both X and Y axes
+        break;
+    case 5:
+        // Extreme short-cycle strong burst, tests robustness boundary
+        amp_cm = 400.0f;
+        on_s = 0.8f;
+        off_s = 0.5f;
+        axis_mode = 3;  // alternate X/Y per attack cycle
+        break;
+    case 6:
+        // Boundary stress: sustained 5.5 m XY position bias.
+        amp_cm = 550.0f;
+        on_s = 7.0f;
+        off_s = 2.0f;
+        axis_mode = 2;  // both X and Y axes
+        break;
+    case 7:
+        // Upper-bound stress: persistent 8.5 m alternating position bias.
+        amp_cm = 850.0f;
+        on_s = 9.0f;
+        off_s = 1.5f;
+        axis_mode = 3;  // alternate X/Y per attack cycle
         break;
     default:
         // scenario 0 keeps legacy behavior exactly.
@@ -1568,7 +1597,7 @@ void AC_PosControl::configureIMUAttackCycle()
     
     resetIMUAttackSeedIfNeeded();
 
-    const int8_t scenario = static_cast<int8_t>(constrain_int16(sitl->imu_atk_scenario.get(), 0, 3));
+    const int8_t scenario = static_cast<int8_t>(constrain_int16(sitl->imu_atk_scenario.get(), 0, 7));
     float accel_amp = 0.5f;     // m/s/s
     float gyro_amp = 0.2f;      // rad/s
     float on_s = 5.0f;
@@ -1598,6 +1627,38 @@ void AC_PosControl::configureIMUAttackCycle()
         gyro_amp = 0.4f;
         on_s = 6.0f;
         off_s = 2.0f;
+        axis_mode = 6;  // all
+        break;
+    case 4:
+        // Gyro-dominant/yaw drift scenario: high gyro on Z axis, medium accel
+        accel_amp = 0.4f;
+        gyro_amp = 0.6f;
+        on_s = 8.0f;
+        off_s = 1.5f;
+        axis_mode = 5;  // gyro_z (yaw drift)
+        break;
+    case 5:
+        // High intensity full-axis accel+gyro mixed scenario
+        accel_amp = 1.2f;
+        gyro_amp = 0.5f;
+        on_s = 1.2f;
+        off_s = 0.6f;
+        axis_mode = 6;  // all
+        break;
+    case 6:
+        // Boundary stress: long full-axis accel+gyro corruption.
+        accel_amp = 1.8f;
+        gyro_amp = 0.55f;
+        on_s = 8.0f;
+        off_s = 1.0f;
+        axis_mode = 6;  // all
+        break;
+    case 7:
+        // Upper-bound stress: stronger sustained full-axis inertial corruption.
+        accel_amp = 2.5f;
+        gyro_amp = 0.8f;
+        on_s = 10.0f;
+        off_s = 1.0f;
         axis_mode = 6;  // all
         break;
     default:
@@ -1752,12 +1813,3 @@ void AC_PosControl::write_to_piper( float accel_target_x, float accel_target_y,
 }
 
 */
-
-
-
-
-
-
-
-
-

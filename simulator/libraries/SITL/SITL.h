@@ -216,11 +216,11 @@ public:
     AP_Vector3f optflow_pos_offset; // XYZ position of the optical flow sensor focal point relative to the body frame origin (m)
 
     // IMU false data injection parameters
-    AP_Int8  imu_atk_scenario;      // IMU attack scenario selector (0: disabled, 1-3: different attack profiles)
+    AP_Int8  imu_atk_scenario;      // IMU attack scenario selector (0: disabled, 1-7: different attack profiles)
     AP_Int16 imu_atk_seed;          // IMU attack seed for deterministic jitter
     
     // GPS false data injection parameters
-    AP_Int8  gps_atk_scenario;      // GPS attack scenario selector (0: disabled, 1-3: different attack profiles)
+    AP_Int8  gps_atk_scenario;      // GPS attack scenario selector (0: disabled, 1-7: different attack profiles)
     AP_Int16 gps_atk_seed;          // GPS attack seed for deterministic jitter
     
     // IMU attack amplitude values computed and updated by AC_PosControl
