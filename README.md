@@ -132,6 +132,25 @@ python3 simulator/Tools/autotest/run_mode_experiments.py \
   --isolated-sitl-state
 ```
 
+Parallel comparison:
+
+```bash
+python3 simulator/Tools/autotest/run_mode_experiments.py \
+  --attack-grid layered \
+  --modes 0,2,4 \
+  --seeds 0,1,2 \
+  --jobs 4 \
+  --resume
+```
+
+`--jobs 1` is the default serial mode. With `--jobs N`, the runner starts N
+independent SITL instances using sim_vehicle `-I` values starting at
+`--parallel-instance-base` (default `1`). Worker MAVLink ports are
+`14550 + 10 * instance`, so the default four workers use UDP ports
+`14560`, `14570`, `14580`, and `14590`. Parallel workers use isolated SITL
+state directories and `sim_vehicle.py --no-kill-tasks`; normal manual
+`sim_vehicle.py --console --map` runs are unchanged.
+
 Dry-run a plan without launching SITL:
 
 ```bash

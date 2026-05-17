@@ -14,7 +14,9 @@ import csv
 import glob
 import json
 import math
+import multiprocessing
 import os
+import queue
 import shutil
 import signal
 import subprocess
@@ -530,6 +532,11 @@ def set_run_params(mav, meta, defer_attack=False):
 def start_sim(args, run_dir, stdout_path, state_dir=None, launch_param_path=None):
     sim_vehicle_path = os.path.join(SCRIPT_DIR, "sim_vehicle.py")
     sim_cmd = [args.sim_vehicle_py, sim_vehicle_path, "--aircraft", args.aircraft]
+    sim_instance = getattr(args, "sim_instance", 0)
+    if sim_instance is not None:
+        sim_cmd.extend(["-I", str(sim_instance)])
+    if getattr(args, "sim_vehicle_no_kill_tasks", False):
+        sim_cmd.append("--no-kill-tasks")
     if not args.sim_rebuild:
         sim_cmd.append("--no-rebuild")
     if args.show_console:
@@ -1931,6 +1938,202 @@ def should_skip_run(args, meta):
         return False
 
 
+def mavlink_addr_for_instance(args, instance):
+    template = getattr(args, "mavlink", None) or DEFAULT_MAVLINK_ADDR
+    port = int(getattr(args, "parallel_mavlink_base_port", 14550)) + 10 * int(instance)
+    if "{instance}" in template or "{port}" in template:
+        return template.format(instance=instance, port=port)
+    if int(getattr(args, "jobs", 1) or 1) > 1 and template != DEFAULT_MAVLINK_ADDR:
+        raise ValueError("parallel --mavlink must include {instance} or {port}, or use the default")
+    if int(getattr(args, "jobs", 1) or 1) > 1:
+        return "udp:127.0.0.1:%d" % port
+    return template
+
+
+def make_worker_args(args, slot):
+    worker_args = argparse.Namespace(**vars(args))
+    instance = int(args.parallel_instance_base) + int(slot)
+    worker_args.parallel_worker_slot = int(slot)
+    worker_args.sim_instance = instance
+    worker_args.mavlink = mavlink_addr_for_instance(args, instance)
+    worker_args.aircraft = "%s_i%d" % (args.aircraft, instance)
+    worker_args.sim_vehicle_no_kill_tasks = True
+    worker_args.isolated_sitl_state = True
+    worker_args.shared_sitl_state = False
+    worker_args.force_cleanup = False
+    return worker_args
+
+
+def parallel_worker_main(args_dict, slot, task_queue, result_queue):
+    args = argparse.Namespace(**args_dict)
+    args = make_worker_args(args, slot)
+    progress(
+        "[WORKER %d] instance=%d mavlink=%s aircraft=%s"
+        % (slot, args.sim_instance, args.mavlink, args.aircraft)
+    )
+    while True:
+        meta = task_queue.get()
+        if meta is None:
+            result_queue.put({"kind": "worker_done", "slot": slot})
+            return
+        try:
+            analysis = run_one(args, meta)
+            result_queue.put(
+                {
+                    "kind": "done",
+                    "slot": slot,
+                    "run_id": meta.get("run_id"),
+                    "status": analysis.get("status"),
+                    "success": analysis.get("success"),
+                }
+            )
+        except KeyboardInterrupt:
+            result_queue.put({"kind": "interrupted", "slot": slot, "run_id": meta.get("run_id")})
+            return
+        except BaseException as exc:
+            result_queue.put(
+                {
+                    "kind": "worker_error",
+                    "slot": slot,
+                    "run_id": meta.get("run_id"),
+                    "error": repr(exc),
+                }
+            )
+
+
+def pending_manifest_rows(args, manifest):
+    pending = []
+    for meta in manifest:
+        if should_skip_run(args, meta):
+            print("[SKIP] %s" % meta["run_id"])
+            continue
+        pending.append(meta)
+    return pending
+
+
+def run_manifest_serial(args, manifest):
+    for meta in pending_manifest_rows(args, manifest):
+        try:
+            analysis = run_one(args, meta)
+            print("[DONE] %s status=%s success=%s" % (meta["run_id"], analysis.get("status"), analysis.get("success")))
+        except KeyboardInterrupt:
+            print("[INFO] Interrupted; aggregating completed runs before exit")
+            break
+
+
+def terminate_processes(processes):
+    for proc in processes:
+        if proc.is_alive():
+            proc.terminate()
+    for proc in processes:
+        proc.join(timeout=5)
+
+
+def run_manifest_parallel(args, manifest):
+    pending = pending_manifest_rows(args, manifest)
+    if not pending:
+        return
+    jobs = max(1, int(args.jobs))
+    if jobs == 1:
+        for meta in pending:
+            try:
+                analysis = run_one(args, meta)
+                print("[DONE] %s status=%s success=%s" % (meta["run_id"], analysis.get("status"), analysis.get("success")))
+            except KeyboardInterrupt:
+                print("[INFO] Interrupted; aggregating completed runs before exit")
+                break
+        return
+
+    if args.force_cleanup:
+        print("[WARN] Ignoring --force-cleanup during parallel runs; global pkill would stop other workers.")
+        args.force_cleanup = False
+    if args.show_console or args.show_map:
+        print("[WARN] --show-console/--show-map will open one UI per parallel worker.")
+
+    first_instance = int(args.parallel_instance_base)
+    last_instance = first_instance + jobs - 1
+    print(
+        "[INFO] Parallel runner: jobs=%d instances=%d..%d mavlink_base_port=%d"
+        % (jobs, first_instance, last_instance, int(args.parallel_mavlink_base_port))
+    )
+    print("[INFO] sim_vehicle --no-kill-tasks is enabled for workers to avoid cross-killing parallel SITL instances.")
+
+    task_queue = multiprocessing.Queue()
+    result_queue = multiprocessing.Queue()
+    for meta in pending:
+        task_queue.put(meta)
+    for _ in range(jobs):
+        task_queue.put(None)
+
+    args_dict = vars(args)
+    processes = []
+    for slot in range(jobs):
+        proc = multiprocessing.Process(
+            target=parallel_worker_main,
+            args=(args_dict, slot, task_queue, result_queue),
+        )
+        proc.daemon = False
+        proc.start()
+        processes.append(proc)
+
+    completed = 0
+    workers_done = 0
+    try:
+        while completed < len(pending):
+            try:
+                msg = result_queue.get(timeout=1.0)
+            except queue.Empty:
+                failed = [proc for proc in processes if (not proc.is_alive()) and proc.exitcode not in (0, None)]
+                if failed:
+                    terminate_processes(processes)
+                    raise RuntimeError("parallel worker exited unexpectedly: %s" % [p.exitcode for p in failed])
+                continue
+
+            kind = msg.get("kind")
+            if kind == "done":
+                completed += 1
+                print(
+                    "[DONE][worker %s] %s status=%s success=%s (%d/%d)"
+                    % (
+                        msg.get("slot"),
+                        msg.get("run_id"),
+                        msg.get("status"),
+                        msg.get("success"),
+                        completed,
+                        len(pending),
+                    )
+                )
+            elif kind == "worker_done":
+                workers_done += 1
+            elif kind == "interrupted":
+                print("[INFO] Worker %s interrupted during %s" % (msg.get("slot"), msg.get("run_id")))
+                break
+            elif kind == "worker_error":
+                completed += 1
+                print(
+                    "[ERROR][worker %s] %s %s (%d/%d)"
+                    % (msg.get("slot"), msg.get("run_id"), msg.get("error"), completed, len(pending))
+                )
+
+        while workers_done < jobs:
+            try:
+                msg = result_queue.get(timeout=0.5)
+            except queue.Empty:
+                if all(not proc.is_alive() for proc in processes):
+                    break
+                continue
+            if msg.get("kind") == "worker_done":
+                workers_done += 1
+    except KeyboardInterrupt:
+        print("[INFO] Interrupted; stopping parallel workers before aggregate analysis")
+        terminate_processes(processes)
+        return
+    finally:
+        for proc in processes:
+            proc.join(timeout=5)
+        terminate_processes(processes)
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--modes", default="0,2,4", help="Comma-separated ATC_PIPER_MODE values.")
@@ -1960,13 +2163,16 @@ def parse_args(argv):
     parser.add_argument("--skip-build", action="store_true", help="Do not run ./waf copter before experiments.")
     parser.add_argument("--sim-rebuild", action="store_true", help="Allow sim_vehicle to rebuild instead of passing --no-rebuild.")
     parser.add_argument("--sim-vehicle-py", default=os.environ.get("SIMVEHICLE_PY", "python2.7"), help="Python executable used to run sim_vehicle.py.")
-    parser.add_argument("--mavlink", default=DEFAULT_MAVLINK_ADDR, help="MAVLink connection string.")
+    parser.add_argument("--mavlink", default=DEFAULT_MAVLINK_ADDR, help="MAVLink connection string. In parallel mode, may contain {instance} or {port}.")
     parser.add_argument("--aircraft", default="pid_piper_mode_experiment", help="sim_vehicle aircraft name.")
     parser.add_argument("--show-map", action="store_true", help="Pass --map to sim_vehicle. Disabled by default to avoid leftover map windows.")
     parser.add_argument("--show-console", action="store_true", help="Pass --console to sim_vehicle. Disabled by default.")
     parser.add_argument("--force-cleanup", action="store_true", help="After each run, pkill known simulator helper processes on POSIX.")
     parser.add_argument("--allow-windows-live", action="store_true", help="Allow live SITL launch from Windows. Normally run live experiments inside WSL/Linux.")
     parser.add_argument("--max-runs", type=int, default=None, help="Limit the number of planned runs for smoke testing.")
+    parser.add_argument("--jobs", type=int, default=1, help="Number of SITL runs to execute in parallel. Default 1 keeps the original serial behavior.")
+    parser.add_argument("--parallel-instance-base", type=int, default=1, help="First sim_vehicle -I instance used by --jobs workers.")
+    parser.add_argument("--parallel-mavlink-base-port", type=int, default=14550, help="UDP MAVLink base port; worker port is base + 10 * instance.")
     parser.add_argument("--heartbeat-timeout", type=float, default=30.0)
     parser.add_argument("--start-settle", type=float, default=2.0)
     parser.add_argument("--post-heartbeat-settle", type=float, default=10.0)
@@ -2026,6 +2232,9 @@ def parse_args(argv):
 def main(argv=None):
     args = parse_args(argv or sys.argv[1:])
     configure_stress_defaults(args)
+    if args.jobs < 1:
+        eprint("[ERROR] --jobs must be >= 1")
+        return 2
 
     if args.analyze_only:
         aggregate_analysis(os.path.abspath(args.analyze_only), force_reanalyze=args.force_reanalyze, refresh_success=args.refresh_success)
@@ -2081,16 +2290,10 @@ def main(argv=None):
     if args.force_cleanup:
         force_cleanup_leftovers()
 
-    for meta in manifest:
-        if should_skip_run(args, meta):
-            print("[SKIP] %s" % meta["run_id"])
-            continue
-        try:
-            analysis = run_one(args, meta)
-            print("[DONE] %s status=%s success=%s" % (meta["run_id"], analysis.get("status"), analysis.get("success")))
-        except KeyboardInterrupt:
-            print("[INFO] Interrupted; aggregating completed runs before exit")
-            break
+    if args.jobs == 1:
+        run_manifest_serial(args, manifest)
+    else:
+        run_manifest_parallel(args, manifest)
 
     aggregate_analysis(args.output_dir)
     return 0

@@ -533,6 +533,8 @@ def start_vehicle(binary, autotest, opts, stuff, loc):
     """Run the ArduPilot binary"""
 
     cmd_name = opts.vehicle
+    if opts.instance != 0:
+        cmd_name += "-I%s" % opts.instance
     cmd = []
     if opts.valgrind:
         cmd_name += " (valgrind)"
@@ -906,6 +908,11 @@ group_sim.add_option("", "--no-extra-ports",
                      dest='no_extra_ports',
                      default=False,
                      help="Disable setup of UDP 14550 and 14551 output")
+group_sim.add_option("", "--no-kill-tasks",
+                     action='store_true',
+                     dest='no_kill_tasks',
+                     default=False,
+                     help="Do not run sim_vehicle's global process cleanup at startup or exit")
 group_sim.add_option("-Z", "--swarm",
                      type='string',
                      default=None,
@@ -942,7 +949,8 @@ parser.add_option_group(group)
 cmd_opts, cmd_args = parser.parse_args()
 
 # clean up processes at exit:
-atexit.register(kill_tasks)
+if not cmd_opts.no_kill_tasks:
+    atexit.register(kill_tasks)
 
 progress("Start")
 
@@ -1026,7 +1034,7 @@ if not os.path.exists(vehicle_dir):
     sys.exit(1)
 
 if not cmd_opts.hil:
-    if cmd_opts.instance == 0:
+    if cmd_opts.instance == 0 and not cmd_opts.no_kill_tasks:
         kill_tasks()
 
 if cmd_opts.tracker:
